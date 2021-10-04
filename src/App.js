@@ -1,7 +1,6 @@
-import { Component } from 'react';
+import {useState, useEffect} from "react";
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import api from './servises/api';
 import LoaderSpiner from './Loader/Loader';
 import SearchBar from './Searchbar/Searchbar';
 import ImageGallery from './ImageGallery/ImageGallery';
@@ -9,110 +8,105 @@ import Button from './Button/Button';
 import Modal from './Modal/Modal';
 import s from './App.module.css';
 
-export default class App extends Component {
-  state = {
-    imageName: '',
-    page: 1,
-    images: [],
-    modalIsOpen: false,
-    selectedImage: null,
-    status: 'idle',
-    error: null,
-  };
 
-  componentDidUpdate(_, prevState) {
-    const { imageName, page } = this.state;
-    if (prevState.imageName !== imageName || prevState.page !== page) {
-      this.setState({ status: 'pending' });
+export default function App() {
+  const [showModal, setShowModal] = useState(false);
+  const [images, setImages] = useState([]);
+  const [page, setPage] = useState(1);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [error, setError] = useState(null);
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
 
-      api
-        .fetchImages(imageName, page)
+
+
+
+useEffect(() =>{
+
+  
+  if (!searchQuery ) {
+    return;
+  }
+       setIsLoading(true)     
+      const API_KEY = "21675881-9f2314d809854342b3af65054";
+      const BASE_URL = "https://pixabay.com/api";
+
+      fetch(`${BASE_URL}/?q=${searchQuery}&page=${page}&key=${API_KEY}&image_type=photo&orientation=horizontal&per_page=12`)
+        .then((response) => {
+          if (response.ok) {
+            return response.json()
+           
+          }
+          return Promise.reject(
+            new Error(`No image with name ${searchQuery}`),
+          );
+        })
+     
         .then(data => data.hits)
-        .then(pictures =>
-          this.setState(prevState => ({
-            images: [...prevState.images, ...pictures],
-            status: 'resolved',
-          })),
-        )
-        .catch(error => this.setState({ error, status: 'rejected' }));
-    }
-    if (prevState.images !== this.state.images) {
-      window.scrollTo({
-        top: document.body.scrollHeight,
-        behavior: 'smooth',
-      });
-    }
-  }
+        .then(arrayImage => {
+          setImages(prevImages => [...prevImages, ...arrayImage]);
+        })
+        .catch(error => error)
+        .finally(() => {
+          setIsLoading( false );
+          window.scrollTo({
+            top: document.body.scrollHeight,
+            behavior: "smooth",
+          });
+        });
 
-  resetState = () => {
-    this.setState({
-      imageName: '',
-      page: 1,
-      images: [],
-      selectedImage: null,
-      status: 'idle',
-    });
+}, [searchQuery, page])
+    
+
+const  resetState = () => {
+    
+  setShowModal(false);
+  setImages([]);
+  setPage(1);
+  setSearchQuery('');
+  setError(null);
+  setSelectedImage(null);
+  setIsLoading(false)
   };
+    
 
-  handleFormSubmit = imageName => {
-    this.resetState();
-    this.setState({ imageName });
+
+ const  handleFormSubmit = searchQuery => {
+     resetState();
+    setSearchQuery(searchQuery)
   };
+ 
+const openModal = (src, alt) => {
 
-  openModal = (src, alt) => {
-    this.setState({
-      modalIsOpen: true,
-      selectedImage: { src, alt },
-    });
-  };
-  closeModal = () => this.setState({ modalIsOpen: false });
+  setShowModal(true);
+    setSelectedImage({ src, alt });
 
-  onLoadMore = () => {
-    this.setState(prevState => ({ page: prevState.page + 1 }));
-  };
-
-  render() {
-    const { images, error, status, selectedImage, modalIsOpen } = this.state;
-
-    if (status === 'idle') {
-      return (
-        <div className={s.App}>
-          <SearchBar onSubmit={this.handleFormSubmit} />
-        </div>
-      );
-    }
-    if (status === 'pending') {
-      return (
-        <div className={s.App}>
-          <SearchBar onSubmit={this.handleFormSubmit} />
-          <ImageGallery openModal={this.openModal} images={images} />
-          <LoaderSpiner />
-          {images.length > 0 && <Button onClick={this.onLoadMore} />}
-        </div>
-      );
-    }
-    if (status === 'rejected') {
-      return (
-        <div className={s.App}>
-          <SearchBar onSubmit={this.handleFormSubmit} />
-          <h1>{error.message}</h1>
-        </div>
-      );
-    }
-    if (status === 'resolved') {
-      return (
-        <div className={s.App}>
-          <SearchBar onSubmit={this.handleFormSubmit}/>
-        
-          <ImageGallery openModal={this.openModal} images={images} />
-          {images.length > 0 && <Button onClick={this.onLoadMore} />}
-          {modalIsOpen && (
-            <Modal image={selectedImage} onClose={this.closeModal} />
-          )}
-          <ToastContainer />
-          </div>
-          
-      );
-    }
-  }
 }
+  
+const  closeModal = () => setShowModal(false);
+  
+const  onLoadMore = () => {
+    setPage(prevPage => ( prevPage + 1 ));
+  };
+
+
+  
+
+    return (
+       
+      <div className={s.App}>
+        <SearchBar onSubmit={handleFormSubmit} />
+         {error && <h1>{error.message}</h1>}
+        {searchQuery && <ImageGallery openModal={openModal} images={images}/>}
+        
+          <ToastContainer />
+        {isLoading && <LoaderSpiner />}
+        
+ {images.length > 0 && <Button onClick={onLoadMore} />}
+        
+
+        {showModal && <Modal image={selectedImage} onClose={closeModal}  >
+        </ Modal >}
+      </div>
+    );
+  }
